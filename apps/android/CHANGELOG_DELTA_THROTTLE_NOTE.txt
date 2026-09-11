@@ -1,0 +1,3 @@
+*** Update QianwenViewModelJava: add delta merging and throttling ***
+
+This change introduces a deltaBuffer to accumulate high-frequency StreamDeltaEvent deltas per message id and a scheduled flush to apply aggregated deltas to the UI at a controlled rate (120ms). It reduces UI update frequency and combines multiple rapid deltas into single updates to the adapter.

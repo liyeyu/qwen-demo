@@ -94,6 +94,18 @@ public class MessagesAdapter extends RecyclerView.Adapter<MessagesAdapter.VH> {
         ChatMessage m = items.get(position);
         holder.role.setText(m.role == null ? "" : m.role);
         holder.content.setText(m.content == null ? "" : m.content);
+        if (m.status == null || m.status.isEmpty()) {
+            holder.status.setVisibility(View.GONE);
+        } else {
+            holder.status.setVisibility(View.VISIBLE);
+            holder.status.setText(m.status);
+        }
+        if (m.error == null || m.error.isEmpty()) {
+            holder.error.setVisibility(View.GONE);
+        } else {
+            holder.error.setVisibility(View.VISIBLE);
+            holder.error.setText(m.error);
+        }
     }
 
     @Override
@@ -113,14 +125,37 @@ public class MessagesAdapter extends RecyclerView.Adapter<MessagesAdapter.VH> {
                             holder.role.setText(m.role == null ? "" : m.role);
                             break;
                         case "status":
+                            if (m.status == null || m.status.isEmpty()) {
+                                holder.status.setVisibility(View.GONE);
+                            } else {
+                                holder.status.setVisibility(View.VISIBLE);
+                                holder.status.setText(m.status);
+                            }
+                            break;
                         case "error":
-                            // status/error currently not shown separately in item view; if needed, update UI here
-                            holder.content.setText(m.content == null ? "" : m.content);
+                            if (m.error == null || m.error.isEmpty()) {
+                                holder.error.setVisibility(View.GONE);
+                            } else {
+                                holder.error.setVisibility(View.VISIBLE);
+                                holder.error.setText(m.error);
+                            }
                             break;
                         default:
                             // fallback to full bind
                             holder.role.setText(m.role == null ? "" : m.role);
                             holder.content.setText(m.content == null ? "" : m.content);
+                            if (m.status == null || m.status.isEmpty()) {
+                                holder.status.setVisibility(View.GONE);
+                            } else {
+                                holder.status.setVisibility(View.VISIBLE);
+                                holder.status.setText(m.status);
+                            }
+                            if (m.error == null || m.error.isEmpty()) {
+                                holder.error.setVisibility(View.GONE);
+                            } else {
+                                holder.error.setVisibility(View.VISIBLE);
+                                holder.error.setText(m.error);
+                            }
                             break;
                     }
                 }
@@ -139,11 +174,15 @@ public class MessagesAdapter extends RecyclerView.Adapter<MessagesAdapter.VH> {
     static class VH extends RecyclerView.ViewHolder {
         final TextView role;
         final TextView content;
+        final TextView status;
+        final TextView error;
 
         VH(@NonNull View itemView) {
             super(itemView);
             role = itemView.findViewById(com.qianwen.demo.R.id.role);
             content = itemView.findViewById(com.qianwen.demo.R.id.content);
+            status = itemView.findViewById(com.qianwen.demo.R.id.status);
+            error = itemView.findViewById(com.qianwen.demo.R.id.error);
         }
     }
 }
