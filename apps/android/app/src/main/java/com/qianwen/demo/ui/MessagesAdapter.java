@@ -57,8 +57,24 @@ public class MessagesAdapter extends RecyclerView.Adapter<MessagesAdapter.VH> {
 
             @Override
             public Object getChangePayload(int oldItemPosition, int newItemPosition) {
-                // Use full bind for simplicity; could return specific payloads
-                return null;
+                // Return a list of changed fields so onBindViewHolder can do partial updates
+                ChatMessage o = old.get(oldItemPosition);
+                ChatMessage n = items.get(newItemPosition);
+                List<String> changes = new ArrayList<>();
+                if (o == null || n == null) return changes;
+                if (!(o.content == null ? "" : o.content).equals(n.content == null ? "" : n.content)) {
+                    changes.add("content");
+                }
+                if (!(o.role == null ? "" : o.role).equals(n.role == null ? "" : n.role)) {
+                    changes.add("role");
+                }
+                if (!(o.status == null ? "" : o.status).equals(n.status == null ? "" : n.status)) {
+                    changes.add("status");
+                }
+                if (!(o.error == null ? "" : o.error).equals(n.error == null ? "" : n.error)) {
+                    changes.add("error");
+                }
+                return changes;
             }
         });
 
@@ -78,6 +94,41 @@ public class MessagesAdapter extends RecyclerView.Adapter<MessagesAdapter.VH> {
         ChatMessage m = items.get(position);
         holder.role.setText(m.role == null ? "" : m.role);
         holder.content.setText(m.content == null ? "" : m.content);
+    }
+
+    @Override
+    public void onBindViewHolder(@NonNull VH holder, int position, @NonNull List<Object> payloads) {
+        if (payloads != null && !payloads.isEmpty()) {
+            Object payload = payloads.get(0);
+            if (payload instanceof List) {
+                @SuppressWarnings("unchecked")
+                List<String> changes = (List<String>) payload;
+                ChatMessage m = items.get(position);
+                for (String key : changes) {
+                    switch (key) {
+                        case "content":
+                            holder.content.setText(m.content == null ? "" : m.content);
+                            break;
+                        case "role":
+                            holder.role.setText(m.role == null ? "" : m.role);
+                            break;
+                        case "status":
+                        case "error":
+                            // status/error currently not shown separately in item view; if needed, update UI here
+                            holder.content.setText(m.content == null ? "" : m.content);
+                            break;
+                        default:
+                            // fallback to full bind
+                            holder.role.setText(m.role == null ? "" : m.role);
+                            holder.content.setText(m.content == null ? "" : m.content);
+                            break;
+                    }
+                }
+                return;
+            }
+        }
+        // default full bind
+        onBindViewHolder(holder, position);
     }
 
     @Override
