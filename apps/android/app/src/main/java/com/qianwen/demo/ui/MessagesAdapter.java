@@ -6,6 +6,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.RecyclerView;
 import com.qianwen.demo.data.ChatMessage;
 import java.util.ArrayList;
@@ -15,9 +16,53 @@ public class MessagesAdapter extends RecyclerView.Adapter<MessagesAdapter.VH> {
     private final List<ChatMessage> items = new ArrayList<>();
 
     public void setItems(List<ChatMessage> list) {
+        final List<ChatMessage> old = new ArrayList<>(items);
         items.clear();
         if (list != null) items.addAll(list);
-        notifyDataSetChanged();
+
+        DiffUtil.DiffResult diffResult = DiffUtil.calculateDiff(new DiffUtil.Callback() {
+            @Override
+            public int getOldListSize() {
+                return old.size();
+            }
+
+            @Override
+            public int getNewListSize() {
+                return items.size();
+            }
+
+            @Override
+            public boolean areItemsTheSame(int oldItemPosition, int newItemPosition) {
+                ChatMessage o = old.get(oldItemPosition);
+                ChatMessage n = items.get(newItemPosition);
+                if (o.id == null || n.id == null) {
+                    return o == n;
+                }
+                return o.id.equals(n.id);
+            }
+
+            @Override
+            public boolean areContentsTheSame(int oldItemPosition, int newItemPosition) {
+                ChatMessage o = old.get(oldItemPosition);
+                ChatMessage n = items.get(newItemPosition);
+                if (o == n) return true;
+                if (o == null || n == null) return false;
+                // compare relevant fields
+                boolean sameContent = (o.content == null ? "" : o.content).equals(n.content == null ? "" : n.content);
+                boolean sameRole = (o.role == null ? "" : o.role).equals(n.role == null ? "" : n.role);
+                boolean sameStatus = (o.status == null ? "" : o.status).equals(n.status == null ? "" : n.status);
+                boolean sameError = (o.error == null ? "" : o.error).equals(n.error == null ? "" : n.error);
+                return sameContent && sameRole && sameStatus && sameError;
+            }
+
+            @Override
+            public Object getChangePayload(int oldItemPosition, int newItemPosition) {
+                // Use full bind for simplicity; could return specific payloads
+                return null;
+            }
+        });
+
+        diffResult.dispatchUpdatesTo(this);
     }
 
     @NonNull
