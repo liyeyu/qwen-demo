@@ -1,5 +1,6 @@
 package com.qianwen.demo.ui;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -33,7 +34,11 @@ public class ConversationsActivity extends AppCompatActivity {
         adapter = new ConversationsAdapter(conversation -> {
             // select conversation in viewmodel
             viewModel.selectConversation(conversation.id, conversation.title);
-            Toast.makeText(ConversationsActivity.this, "已选择会话: " + conversation.title, Toast.LENGTH_SHORT).show();
+            // also open ChatActivity and pass conversation id/title
+            Intent intent = new Intent(ConversationsActivity.this, ChatActivity.class);
+            intent.putExtra(ChatActivity.EXTRA_CONV_ID, conversation.id);
+            intent.putExtra(ChatActivity.EXTRA_TITLE, conversation.title == null ? "" : conversation.title);
+            startActivity(intent);
         });
         recycler.setLayoutManager(new LinearLayoutManager(this));
         recycler.setAdapter(adapter);
