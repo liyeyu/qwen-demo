@@ -16,5 +16,6 @@
             </intent-filter>
         </activity>
         <activity android:name=".ui.ConversationsActivity" android:exported="true" />
+        <activity android:name=".ui.ChatActivity" android:exported="true" />
     </application>
 </manifest>
