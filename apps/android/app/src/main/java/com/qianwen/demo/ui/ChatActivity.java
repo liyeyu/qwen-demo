@@ -1,6 +1,8 @@
 package com.qianwen.demo.ui;
 
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
@@ -21,13 +23,21 @@ public class ChatActivity extends AppCompatActivity {
 
     private QianwenViewModelJava viewModel;
     private MessagesAdapter adapter;
+    private RecyclerView recycler;
+    private final Handler uiHandler = new Handler(Looper.getMainLooper());
+    private final Runnable scrollRunnable = new Runnable() {
+        @Override
+        public void run() {
+            scrollToBottomIfNeeded();
+        }
+    };
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(com.qianwen.demo.R.layout.activity_chat);
 
-        RecyclerView recycler = findViewById(com.qianwen.demo.R.id.messages_recycler);
+        recycler = findViewById(com.qianwen.demo.R.id.messages_recycler);
         EditText input = findViewById(com.qianwen.demo.R.id.input);
         Button send = findViewById(com.qianwen.demo.R.id.send_button);
         Button cancel = findViewById(com.qianwen.demo.R.id.cancel_button);
@@ -61,10 +71,25 @@ public class ChatActivity extends AppCompatActivity {
             if (state == null) return;
             List<ChatMessage> msgs = state.messagesByConversation.get(state.selectedConversationId);
             adapter.setItems(msgs);
-            // update draft
-            if (!input.getText().toString().equals(state.draft == null ? "" : state.draft)) {
-                input.setText(state.draft == null ? "" : state.draft);
+
+            // debounce scroll to bottom to avoid excessive UI work on fast streaming updates
+            uiHandler.removeCallbacks(scrollRunnable);
+            uiHandler.postDelayed(scrollRunnable, 120);
+
+            // update draft if different
+            String draft = state.draft == null ? "" : state.draft;
+            if (!input.getText().toString().equals(draft)) {
+                // preserve cursor position: set only when different
+                input.setText(draft);
+                input.setSelection(draft.length());
             }
+
+            // update send/cancel button states based on streaming
+            boolean streaming = state.isStreaming();
+            send.setEnabled(!streaming);
+            cancel.setEnabled(streaming);
+
+            // optionally change send button text when streaming (kept simple: disabled)
         });
 
         input.addTextChangedListener(new TextWatcher() {
@@ -82,5 +107,19 @@ public class ChatActivity extends AppCompatActivity {
 
         send.setOnClickListener(v -> viewModel.sendMessage());
         cancel.setOnClickListener(v -> viewModel.cancelSending());
+    }
+
+    private void scrollToBottomIfNeeded() {
+        if (recycler == null || adapter == null) return;
+        int count = adapter.getItemCount();
+        if (count <= 0) return;
+        // scroll to last item
+        recycler.scrollToPosition(count - 1);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        uiHandler.removeCallbacksAndMessages(null);
     }
 }
