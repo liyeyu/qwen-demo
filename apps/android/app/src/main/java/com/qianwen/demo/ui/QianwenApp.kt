@@ -89,9 +89,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import androidx.compose.ui.draw.clip
 import com.qianwen.demo.data.ChatMessage
 import com.qianwen.demo.data.Conversation
 import com.qianwen.demo.data.NativeScreen
+import com.qianwen.demo.data.NewsItem
+import com.qianwen.demo.data.NewsParser
 
 private val PageBackground = Color.White
 private val SidebarBackground = Color(0xFFF7F8FB)
@@ -241,7 +245,7 @@ private fun ConversationListScreen(state: QianwenUiState, viewModel: QianwenView
 
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Icon(Icons.Filled.CloudQueue, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(18.dp))
-            Text("服务端 ${state.health?.modelMode ?: serviceStatusText(state.serviceStatus)}", color = TextSecondary)
+            Text("服务端 ${'$'}{state.health?.modelMode ?: serviceStatusText(state.serviceStatus)}", color = TextSecondary)
         }
     }
 }
@@ -326,54 +330,6 @@ private fun StatusScreen(state: QianwenUiState, viewModel: QianwenViewModel) {
         )
         Button(onClick = { viewModel.refreshHealth(showFeedback = true) }, shape = RoundedCornerShape(18.dp)) {
             Text("重新检查")
-        }
-    }
-}
-
-@Composable
-private fun SettingsScreen(state: QianwenUiState, viewModel: QianwenViewModel) {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(PageBackground)
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        SimpleTopBar(title = "调试设置", onBack = { viewModel.navigate(NativeScreen.Conversations) })
-        NoticeText(state.notice)
-        Surface(color = ChipBackground, shape = RoundedCornerShape(18.dp)) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                InfoLine("当前 API", state.apiBaseUrl)
-                Text("模拟器：10.0.2.2 会映射到开发电脑的 localhost。", color = TextPrimary)
-                Text("真机：将 BuildConfig 中的 QWEN_API_BASE_URL 改为电脑局域网 IP。", color = TextPrimary)
-                Text("本地缓存：DataStore 保存最近会话、消息和选中会话。", color = TextPrimary)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ChatTopBar(title: String, subtitle: String, onBack: () -> Unit, onStatus: () -> Unit) {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(72.dp)
-            .padding(horizontal = 14.dp)
-    ) {
-        IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
-            Icon(Icons.Filled.Menu, contentDescription = "返回会话列表", tint = TextPrimary, modifier = Modifier.size(30.dp))
-        }
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.align(Alignment.Center)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(title, fontSize = 28.sp, fontWeight = FontWeight.Black, color = TextPrimary)
-                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, tint = TextSecondary)
-            }
-            Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis, color = TextSecondary, fontSize = 12.sp)
-        }
-        IconButton(onClick = onStatus, modifier = Modifier.align(Alignment.CenterEnd)) {
-            Icon(Icons.Filled.VolumeOff, contentDescription = "服务状态", tint = TextPrimary, modifier = Modifier.size(30.dp))
         }
     }
 }
@@ -516,6 +472,7 @@ private fun ConversationRow(
 @Composable
 private fun MobileMessageBubble(message: ChatMessage, viewModel: QianwenViewModel) {
     val isUser = message.role == "user"
+    val newsList = NewsParser.parse(message.content)
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
@@ -533,20 +490,53 @@ private fun MobileMessageBubble(message: ChatMessage, viewModel: QianwenViewMode
                     bottomEnd = if (isUser) 8.dp else 24.dp
                 )
             ) {
-                Text(
-                    message.content.ifBlank { "正在生成..." },
-                    color = TextPrimary,
-                    fontSize = 18.sp,
-                    lineHeight = 30.sp,
-                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp)
-                )
+                if (!newsList.isEmpty()) {
+                    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                        Text("新闻", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+                        newsList.forEach { item ->
+                            Row(modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.showNotice(item.title)
+                                }
+                                .padding(vertical = 8.dp)
+                            ) {
+                                val imageUrl = item.resolvedImageUrl()
+                                if (imageUrl != null && imageUrl.isNotBlank()) {
+                                    AsyncImage(
+                                        model = imageUrl,
+                                        contentDescription = item.title,
+                                        modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp))
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                }
+                                Text(
+                                    item.title ?: "",
+                                    color = TextPrimary,
+                                    fontSize = 15.sp,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    Text(
+                        message.content.ifBlank { "正在生成..." },
+                        color = TextPrimary,
+                        fontSize = 18.sp,
+                        lineHeight = 30.sp,
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp)
+                    )
+                }
             }
             if (!isUser) {
                 AssistantActionRow(message, viewModel)
             }
             if (message.status == "streaming" || message.status == "error" || message.error != null) {
                 Text(
-                    "状态：${message.status}${message.error?.let { " · $it" } ?: ""}",
+                    "状态：${'$'}{message.status}${'$'}{message.error?.let { " · $it" } ?: ""}",
                     color = if (message.status == "error") Color(0xFFA3341D) else TextSecondary,
                     fontSize = 12.sp,
                     modifier = Modifier.padding(top = 4.dp)
@@ -705,7 +695,7 @@ private fun ToolChip(icon: ImageVector, text: String, onClick: () -> Unit) {
 @Composable
 private fun CacheText(state: QianwenUiState) {
     val savedAt = state.lastCacheSavedAt ?: return
-    Text("本地缓存：${cacheStatusText(state.cacheStatus)} · $savedAt", color = TextSecondary, fontSize = 12.sp)
+    Text("本地缓存：${'$'}{cacheStatusText(state.cacheStatus)} · ${'$'}savedAt", color = TextSecondary, fontSize = 12.sp)
 }
 
 @Composable
