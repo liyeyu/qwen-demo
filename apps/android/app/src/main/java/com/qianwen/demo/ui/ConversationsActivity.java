@@ -12,7 +12,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import com.qianwen.demo.data.QianwenRepositoryJava;
+import com.qianwen.demo.data.store.QianwenRepositoryJava;
 import java.util.List;
 
 public class ConversationsActivity extends AppCompatActivity {
