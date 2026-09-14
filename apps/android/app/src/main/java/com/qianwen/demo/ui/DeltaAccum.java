@@ -1,14 +1,13 @@
 package com.qianwen.demo.ui;
 
-import android.os.Handler;
-import android.os.Looper;
-
 // delta merging helper used by QianwenViewModelJava
-class DeltaAccum {
-    final String conversationId;
-    final StringBuilder sb = new StringBuilder();
+public class DeltaAccum {
+    public final String conversationId;
+    public final String messageId;
+    public final StringBuilder sb = new StringBuilder();
 
-    DeltaAccum(String conversationId) {
+    public DeltaAccum(String conversationId, String messageId) {
         this.conversationId = conversationId;
+        this.messageId = messageId;
     }
 }

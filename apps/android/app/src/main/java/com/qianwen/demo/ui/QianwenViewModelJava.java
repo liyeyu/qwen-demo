@@ -2,33 +2,38 @@ package com.qianwen.demo.ui;
 
 import android.os.Handler;
 import android.os.Looper;
-import androidx.lifecycle.LiveData;
-import androidx.lifecycle.MutableLiveData;
-import androidx.lifecycle.ViewModel;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 import com.qianwen.demo.data.ChatMessage;
-import com.qianwen.demo.data.ChatStreamEvent;
-import com.qianwen.demo.data.StreamDeltaEvent;
-import com.qianwen.demo.data.StreamDoneEvent;
-import com.qianwen.demo.data.StreamErrorEvent;
-import com.qianwen.demo.data.StreamMessageEvent;
-import com.qianwen.demo.data.LocalSnapshotResult;
 import com.qianwen.demo.data.QianwenRepositoryJava;
-import com.qianwen.demo.data.SnapshotReadStatus;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-public class QianwenViewModelJava extends ViewModel {
+public class QianwenViewModelJava extends androidx.lifecycle.ViewModel {
     private final QianwenRepositoryJava repository;
-    private final MutableLiveData<QianwenUiState> _state = new MutableLiveData<>(new QianwenUiState());
-    public LiveData<QianwenUiState> state = _state;
+    private final androidx.lifecycle.MutableLiveData<QianwenUiState> _state = new androidx.lifecycle.MutableLiveData<>(new QianwenUiState());
+    public androidx.lifecycle.LiveData<QianwenUiState> state = _state;
     private final ExecutorService executor = Executors.newCachedThreadPool();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private Future<?> sendFuture = null;
+
+    // delta buffer: messageId -> DeltaAccum
+    private final Map<String, DeltaAccum> deltaBuffer = new ConcurrentHashMap<>();
+    private final Runnable flushRunnable = this::flushDeltas;
+    private static final int FLUSH_DELAY_MS = 120;
 
     public QianwenViewModelJava(QianwenRepositoryJava repository, String configuredApiBaseUrl) {
         this.repository = repository;
@@ -65,8 +70,8 @@ public class QianwenViewModelJava extends ViewModel {
 
     private void restoreLocalSnapshot() {
         try {
-            LocalSnapshotResult res = repository.readSnapshot();
-            if (res != null && SnapshotReadStatus.Restored.equals(res.status)) {
+            com.qianwen.demo.data.LocalSnapshotResult res = repository.readSnapshot();
+            if (res != null && com.qianwen.demo.data.SnapshotReadStatus.Restored.equals(res.status)) {
                 QianwenUiState s = currentStateCopy();
                 s.cacheStatus = CacheStatus.RESTORED;
                 s.selectedConversationId = res.snapshot.selectedConversationId;
@@ -92,7 +97,7 @@ public class QianwenViewModelJava extends ViewModel {
             QianwenUiState s = currentStateCopy();
             s.health = h;
             s.serviceStatus = ServiceStatus.ONLINE;
-            s.lastHealthCheckedAt = Instant.now().toString();
+            s.lastHealthCheckedAt = java.time.Instant.now().toString();
             setStateOnMain(s);
         } catch (Exception e) {
             QianwenUiState s = currentStateCopy();
@@ -185,6 +190,55 @@ public class QianwenViewModelJava extends ViewModel {
         });
     }
 
+    private void flushDeltas() {
+        if (deltaBuffer.isEmpty()) return;
+        // copy keys to avoid concurrent modification
+        List<String> keys = new ArrayList<>(deltaBuffer.keySet());
+        boolean changed = false;
+        QianwenUiState s = currentStateCopy();
+        for (String messageId : keys) {
+            DeltaAccum acc = deltaBuffer.remove(messageId);
+            if (acc == null) continue;
+            String convId = acc.conversationId;
+            String deltaText = acc.sb.toString();
+            if (deltaText.isEmpty()) continue;
+            List<ChatMessage> msgs = s.messagesByConversation.get(convId);
+            if (msgs == null) msgs = new ArrayList<>();
+            // find message by id
+            ChatMessage found = null;
+            for (int i = 0; i < msgs.size(); i++) {
+                ChatMessage m = msgs.get(i);
+                if (messageId != null && messageId.equals(m.id)) {
+                    found = m;
+                    break;
+                }
+            }
+            if (found == null) {
+                ChatMessage assistant = new ChatMessage();
+                assistant.id = messageId == null ? java.util.UUID.randomUUID().toString() : messageId;
+                assistant.conversationId = convId;
+                assistant.role = "assistant";
+                assistant.content = deltaText;
+                assistant.status = "streaming";
+                msgs.add(assistant);
+            } else {
+                found.content = (found.content == null ? "" : found.content) + deltaText;
+                found.status = "streaming";
+            }
+            s.messagesByConversation.put(convId, msgs);
+            s.sendStatus = SendStatus.STREAMING;
+            changed = true;
+        }
+        if (changed) {
+            setStateOnMain(s);
+        }
+    }
+
+    private void scheduleFlush() {
+        mainHandler.removeCallbacks(flushRunnable);
+        mainHandler.postDelayed(flushRunnable, FLUSH_DELAY_MS);
+    }
+
     private class QianwenApiEventAdapter implements com.qianwen.demo.data.QianwenApiClientJava.ChatEventCallback {
         private final String conversationId;
         public QianwenApiEventAdapter(String conversationId) {
@@ -192,38 +246,39 @@ public class QianwenViewModelJava extends ViewModel {
         }
 
         @Override
-        public void onEvent(ChatStreamEvent event) {
-            if (event instanceof StreamDeltaEvent) {
-                StreamDeltaEvent d = (StreamDeltaEvent) event;
-                // append delta to last assistant message
-                mainHandler.post(() -> {
-                    QianwenUiState s = currentStateCopy();
-                    List<ChatMessage> msgs = s.messagesByConversation.get(conversationId);
-                    if (msgs == null) msgs = new ArrayList<>();
-                    ChatMessage assistant = null;
-                    if (!msgs.isEmpty()) {
-                        ChatMessage last = msgs.get(msgs.size() - 1);
-                        if ("assistant".equals(last.role)) {
-                            assistant = last;
-                        }
-                    }
-                    if (assistant == null) {
-                        assistant = new ChatMessage();
-                        assistant.id = java.util.UUID.randomUUID().toString();
+        public void onEvent(com.qianwen.demo.data.ChatStreamEvent event) {
+            if (event instanceof com.qianwen.demo.data.StreamDeltaEvent) {
+                com.qianwen.demo.data.StreamDeltaEvent d = (com.qianwen.demo.data.StreamDeltaEvent) event;
+                // buffer delta per message id and schedule flush
+                String msgId = d.messageId == null ? java.util.UUID.randomUUID().toString() : d.messageId;
+                DeltaAccum acc = deltaBuffer.computeIfAbsent(msgId, k -> new DeltaAccum(conversationId, msgId));
+                synchronized (acc) {
+                    acc.sb.append(d.delta == null ? "" : d.delta);
+                }
+                scheduleFlush();
+            } else if (event instanceof com.qianwen.demo.data.StreamMessageEvent) {
+                // full message received - flush any buffered deltas for this messageId then add message
+                com.qianwen.demo.data.StreamMessageEvent me = (com.qianwen.demo.data.StreamMessageEvent) event;
+                // flush buffer for message id
+                if (me.message != null && me.message.id != null) {
+                    DeltaAccum acc = deltaBuffer.remove(me.message.id);
+                    if (acc != null && acc.sb.length() > 0) {
+                        // apply accumulated delta before replacing with full message
+                        QianwenUiState s = currentStateCopy();
+                        List<ChatMessage> msgs = s.messagesByConversation.get(conversationId);
+                        if (msgs == null) msgs = new ArrayList<>();
+                        ChatMessage assistant = new ChatMessage();
+                        assistant.id = acc.messageId;
                         assistant.conversationId = conversationId;
                         assistant.role = "assistant";
-                        assistant.content = "";
+                        assistant.content = acc.sb.toString();
                         assistant.status = "streaming";
                         msgs.add(assistant);
+                        s.messagesByConversation.put(conversationId, msgs);
+                        setStateOnMain(s);
                     }
-                    assistant.content = (assistant.content == null ? "" : assistant.content) + d.delta;
-                    s.messagesByConversation.put(conversationId, msgs);
-                    s.sendStatus = SendStatus.STREAMING;
-                    _state.setValue(s);
-                });
-            } else if (event instanceof StreamMessageEvent) {
-                // full message received
-                StreamMessageEvent me = (StreamMessageEvent) event;
+                }
+
                 mainHandler.post(() -> {
                     QianwenUiState s = currentStateCopy();
                     List<ChatMessage> msgs = s.messagesByConversation.get(conversationId);
@@ -234,8 +289,27 @@ public class QianwenViewModelJava extends ViewModel {
                     s.draft = "";
                     _state.setValue(s);
                 });
-            } else if (event instanceof StreamDoneEvent) {
-                StreamDoneEvent de = (StreamDoneEvent) event;
+            } else if (event instanceof com.qianwen.demo.data.StreamDoneEvent) {
+                com.qianwen.demo.data.StreamDoneEvent de = (com.qianwen.demo.data.StreamDoneEvent) event;
+                // flush buffered deltas for this message id immediately
+                if (de.message != null && de.message.id != null) {
+                    DeltaAccum acc = deltaBuffer.remove(de.message.id);
+                    if (acc != null && acc.sb.length() > 0) {
+                        QianwenUiState s = currentStateCopy();
+                        List<ChatMessage> msgs = s.messagesByConversation.get(conversationId);
+                        if (msgs == null) msgs = new ArrayList<>();
+                        ChatMessage assistant = new ChatMessage();
+                        assistant.id = acc.messageId;
+                        assistant.conversationId = conversationId;
+                        assistant.role = "assistant";
+                        assistant.content = acc.sb.toString();
+                        assistant.status = "streaming";
+                        msgs.add(assistant);
+                        s.messagesByConversation.put(conversationId, msgs);
+                        setStateOnMain(s);
+                    }
+                }
+
                 mainHandler.post(() -> {
                     QianwenUiState s = currentStateCopy();
                     List<ChatMessage> msgs = s.messagesByConversation.get(conversationId);
@@ -246,13 +320,38 @@ public class QianwenViewModelJava extends ViewModel {
                     s.draft = "";
                     _state.setValue(s);
                 });
-            } else if (event instanceof StreamErrorEvent) {
-                StreamErrorEvent er = (StreamErrorEvent) event;
+            } else if (event instanceof com.qianwen.demo.data.StreamErrorEvent) {
+                com.qianwen.demo.data.StreamErrorEvent er = (com.qianwen.demo.data.StreamErrorEvent) event;
+                // flush and mark error
+                if (er.messageId != null) {
+                    DeltaAccum acc = deltaBuffer.remove(er.messageId);
+                    // we still want to apply any accumulated content as partial
+                    if (acc != null && acc.sb.length() > 0) {
+                        QianwenUiState s = currentStateCopy();
+                        List<ChatMessage> msgs = s.messagesByConversation.get(conversationId);
+                        if (msgs == null) msgs = new ArrayList<>();
+                        ChatMessage assistant = new ChatMessage();
+                        assistant.id = acc.messageId;
+                        assistant.conversationId = conversationId;
+                        assistant.role = "assistant";
+                        assistant.content = acc.sb.toString();
+                        assistant.status = "error";
+                        assistant.error = er.error;
+                        msgs.add(assistant);
+                        s.messagesByConversation.put(conversationId, msgs);
+                        s.sendStatus = SendStatus.FAILED;
+                        s.retryDraft = new RetryDraft(conversationId, s.draft == null ? "" : s.draft, er.error == null ? "stream error" : er.error);
+                        s.error = er.error;
+                        setStateOnMain(s);
+                        return;
+                    }
+                }
+
                 mainHandler.post(() -> {
                     QianwenUiState s = currentStateCopy();
                     s.sendStatus = SendStatus.FAILED;
                     s.retryDraft = new RetryDraft(conversationId, s.draft == null ? "" : s.draft, er.error == null ? "stream error" : er.error);
-                    s.draft = rawTrimmed(s.draft);
+                    s.error = er.error;
                     _state.setValue(s);
                 });
             }
@@ -267,11 +366,6 @@ public class QianwenViewModelJava extends ViewModel {
                 _state.setValue(s);
             });
         }
-
-        private String rawTrimmed(String t) {
-            if (t == null) return "";
-            return t.trim();
-        }
     }
 
     public synchronized void cancelSending() {
@@ -279,6 +373,8 @@ public class QianwenViewModelJava extends ViewModel {
             sendFuture.cancel(true);
             sendFuture = null;
         }
+        // clear pending deltas
+        deltaBuffer.clear();
         QianwenUiState s = currentStateCopy();
         s.sendStatus = SendStatus.CANCELED;
         setStateOnMain(s);
@@ -289,5 +385,7 @@ public class QianwenViewModelJava extends ViewModel {
         super.onCleared();
         executor.shutdownNow();
         repository.shutdown();
+        mainHandler.removeCallbacksAndMessages(null);
+        deltaBuffer.clear();
     }
 }
