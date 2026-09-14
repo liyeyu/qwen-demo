@@ -1,9 +1,8 @@
 <resources>
-    <style name="Theme.Qianwen" parent="android:style/Theme.Material.Light.NoActionBar">
+    <style name="Theme.Qianwen" parent="Theme.AppCompat.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:statusBarColor">#F8FAF8</item>
         <item name="android:navigationBarColor">#F8FAF8</item>
     </style>
 </resources>
-

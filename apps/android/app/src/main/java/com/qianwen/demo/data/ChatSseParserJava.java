@@ -2,8 +2,8 @@ package com.qianwen.demo.data;
 
 public class ChatSseParserJava {
     private String eventName = null;
-    private java.util.List<String> dataLines = new java.util.ArrayList<>();
-    private com.google.gson.Gson gson = new com.google.gson.Gson();
+    private final java.util.List<String> dataLines = new java.util.ArrayList<>();
+    private final com.google.gson.Gson gson = new com.google.gson.Gson();
 
     public ChatStreamEvent parseLine(String line) {
         if (line.startsWith(":")) {
@@ -36,40 +36,27 @@ public class ChatSseParserJava {
         }
 
         String payload = String.join("\n", dataLines);
-        String type = null;
-        try {
-            com.google.gson.JsonObject json = gson.fromJson(payload, com.google.gson.JsonObject.class);
-            if (json != null && json.has("type") && !json.get("type").isJsonNull()) {
-                type = json.get("type").getAsString();
-            }
-        } catch (Exception ignored) {
-        }
-
-        if (type == null) type = eventName;
+        String headerType = eventName;
         eventName = null;
         dataLines.clear();
 
         if ("[DONE]".equals(payload)) return null;
 
+        // SSE 帧可能来自弱网重试或服务端异常中断，这里把解析异常收敛成 error 事件，避免 UI 流程直接崩溃。
         try {
-            switch (type) {
-                case "conversation":
-                    return gson.fromJson(payload, StreamConversationEvent.class);
-                case "message":
-                    return gson.fromJson(payload, StreamMessageEvent.class);
-                case "delta":
-                    return gson.fromJson(payload, StreamDeltaEvent.class);
-                case "done":
-                    return gson.fromJson(payload, StreamDoneEvent.class);
-                case "error":
-                    return gson.fromJson(payload, StreamErrorEvent.class);
-                default:
-                    return null;
+            ChatStreamEvent event = gson.fromJson(payload, ChatStreamEvent.class);
+            if (event == null) {
+                return null;
             }
+            if (event.type == null) {
+                event.type = headerType;
+            }
+            if (!ChatStreamEvent.isKnownType(event.type)) {
+                return null;
+            }
+            return event;
         } catch (Exception e) {
-            StreamErrorEvent err = new StreamErrorEvent();
-            err.error = "SSE parse failed: " + (e.getMessage() == null ? "unknown" : e.getMessage());
-            return err;
+            return ChatStreamEvent.errorEvent("SSE 解析失败：" + (e.getMessage() == null ? "未知错误" : e.getMessage()));
         }
     }
 }

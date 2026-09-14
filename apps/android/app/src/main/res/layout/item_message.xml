@@ -9,32 +9,64 @@
         android:id="@+id/role"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textSize="12sp"
-        android:textColor="#888888" />
+        android:textColor="#888888"
+        android:textSize="12sp" />
 
     <TextView
         android:id="@+id/content"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textSize="16sp"
-        android:textColor="#000000"
         android:paddingTop="4dp"
-        android:paddingBottom="4dp" />
+        android:paddingBottom="4dp"
+        android:textColor="#000000"
+        android:textSize="16sp" />
+
+    <!-- 新闻列表消息的容器，由 MessagesAdapter 按 news 数量动态填充 item_news -->
+    <LinearLayout
+        android:id="@+id/news_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone" />
 
     <TextView
         android:id="@+id/status"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textSize="12sp"
         android:textColor="#666666"
+        android:textSize="12sp"
         android:visibility="gone" />
 
     <TextView
         android:id="@+id/error"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textSize="12sp"
         android:textColor="#B00020"
+        android:textSize="12sp"
         android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/actions"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <Button
+            android:id="@+id/edit_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:text="编辑"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/regenerate_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:text="重新生成"
+            android:textSize="12sp" />
+    </LinearLayout>
 
 </LinearLayout>

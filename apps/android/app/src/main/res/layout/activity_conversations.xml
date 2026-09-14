@@ -1,40 +1,123 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="vertical"
     android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="千问"
+            android:textColor="#11182B"
+            android:textSize="30sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/settings_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:text="设置" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/create_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="新建对话" />
+
+    <EditText
+        android:id="@+id/search_input"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:hint="搜索会话"
+        android:importantForAutofill="no"
+        android:inputType="text"
+        android:maxLines="1" />
 
     <ProgressBar
         android:id="@+id/progress"
-        android:layout_width="wrap_content"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_centerInParent="true"
+        android:layout_marginTop="8dp"
+        android:indeterminate="true"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/cache_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textColor="#666666"
+        android:textSize="12sp"
         android:visibility="gone" />
 
     <TextView
         android:id="@+id/error_text"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_centerInParent="true"
-        android:visibility="gone"
-        android:textColor="#f44336" />
+        android:layout_marginTop="4dp"
+        android:background="#FFF3F0"
+        android:padding="8dp"
+        android:textColor="#8F2C18"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/notice_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:background="#F2F8FF"
+        android:padding="8dp"
+        android:textColor="#25527F"
+        android:visibility="gone" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="最近对话"
+        android:textColor="#B1B7C1"
+        android:textSize="13sp" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_above="@+id/create_button"
-        android:layout_alignParentTop="true"
-        android:clipToPadding="false"
-        android:paddingBottom="72dp" />
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false" />
 
-    <Button
-        android:id="@+id/create_button"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="新建会话"
-        android:layout_alignParentBottom="true"
-        android:layout_alignParentEnd="true"
-        android:layout_margin="16dp" />
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
-</RelativeLayout>
+        <TextView
+            android:id="@+id/service_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="#7A828E"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/status_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:text="服务状态" />
+    </LinearLayout>
+
+</LinearLayout>

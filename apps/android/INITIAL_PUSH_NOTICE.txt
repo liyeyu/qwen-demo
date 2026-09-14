@@ -1,2 +1,0 @@
-// NOTE: This initial push adds Java data models and an OkHttp+Gson API client plus an SSE parser.
-// It does NOT remove or modify existing Kotlin files. Subsequent commits will implement repository, ViewModel and UI conversions.

@@ -1,11 +1,7 @@
 package com.qianwen.demo.data;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonSyntaxException;
 import java.io.IOException;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -18,7 +14,7 @@ public class QianwenApiClientJava {
     private final OkHttpClient client;
     private final Gson gson;
     private final MediaType contentType = MediaType.get("application/json; charset=utf-8");
-    private final ExecutorService executor = Executors.newCachedThreadPool();
+    private volatile okhttp3.Call activeStreamCall = null;
 
     public QianwenApiClientJava(String baseUrl) {
         this(baseUrl, new OkHttpClient(), new Gson());
@@ -51,21 +47,17 @@ public class QianwenApiClientJava {
     }
 
     private <T> T request(String path, String method, RequestBody body, Class<T> clazz) throws IOException {
-        Request.Builder builder = new Request.Builder()
+        Request request = new Request.Builder()
                 .url(baseUrl + path)
                 .method(method, body)
-                .header("content-type", "application/json");
-        Request request = builder.build();
+                .header("content-type", "application/json")
+                .build();
         try (Response response = client.newCall(request).execute()) {
             String responseText = response.body() != null ? response.body().string() : "";
             if (!response.isSuccessful()) {
                 throw new IOException("HTTP " + response.code() + ": " + responseText);
             }
-            try {
-                return gson.fromJson(responseText, clazz);
-            } catch (JsonSyntaxException e) {
-                throw new IOException("JSON parse error: " + e.getMessage(), e);
-            }
+            return gson.fromJson(responseText, clazz);
         }
     }
 
@@ -75,50 +67,57 @@ public class QianwenApiClientJava {
     }
 
     public void streamChat(String conversationId, String message, ChatEventCallback callback) {
-        executor.submit(new Runnable() {
-            @Override
-            public void run() {
-                RequestBody rb = RequestBody.create(gson.toJson(new ChatRequest(conversationId, message)), contentType);
-                Request request = new Request.Builder()
-                        .url(baseUrl + "/chat/stream")
-                        .header("accept", "text/event-stream")
-                        .post(rb)
-                        .build();
-                okhttp3.Call call = client.newCall(request);
-                try (Response response = call.execute()) {
-                    if (!response.isSuccessful()) {
-                        String detail = response.body() != null ? response.body().string() : "";
-                        callback.onError(new IOException("HTTP " + response.code() + ": " + detail));
-                        return;
-                    }
+        RequestBody rb = RequestBody.create(gson.toJson(new ApiModels.ChatRequest(conversationId, message)), contentType);
+        Request request = new Request.Builder()
+                .url(baseUrl + "/chat/stream")
+                .header("accept", "text/event-stream")
+                .post(rb)
+                .build();
+        okhttp3.Call call = client.newCall(request);
+        activeStreamCall = call;
+        try (Response response = call.execute()) {
+            if (!response.isSuccessful()) {
+                String detail = response.body() != null ? response.body().string() : "";
+                callback.onError(new IOException("HTTP " + response.code() + ": " + detail));
+                return;
+            }
 
-                    BufferedSource source = response.body().source();
-                    ChatSseParserJava parser = new ChatSseParserJava();
-                    boolean terminalReceived = false;
-                    while (!terminalReceived) {
-                        String line = source.readUtf8Line();
-                        if (line == null) break;
-                        ChatStreamEvent event = parser.parseLine(line);
-                        if (event != null) {
-                            callback.onEvent(event);
-                            terminalReceived = event instanceof StreamDoneEvent || event instanceof StreamErrorEvent;
-                        }
-                    }
-                    if (!terminalReceived) {
-                        ChatStreamEvent e = parser.flush();
-                        if (e != null) {
-                            callback.onEvent(e);
-                        }
-                    }
-                    if (!terminalReceived) {
-                        callback.onError(new IOException("SSE connection interrupted without done/error event."));
-                    }
-                } catch (Exception e) {
-                    call.cancel();
-                    callback.onError(e);
+            BufferedSource source = response.body().source();
+            ChatSseParserJava parser = new ChatSseParserJava();
+            boolean terminalReceived = false;
+            while (!terminalReceived) {
+                String line = source.readUtf8Line();
+                if (line == null) break;
+                ChatStreamEvent event = parser.parseLine(line);
+                if (event != null) {
+                    callback.onEvent(event);
+                    terminalReceived = event.isTerminal();
                 }
             }
-        });
+            if (!terminalReceived) {
+                ChatStreamEvent event = parser.flush();
+                if (event != null) {
+                    callback.onEvent(event);
+                    terminalReceived = event.isTerminal();
+                }
+            }
+            if (!terminalReceived) {
+                callback.onError(new IOException("SSE connection interrupted without done/error event."));
+            }
+        } catch (Exception e) {
+            if (e instanceof IOException && "Canceled".equals(e.getMessage())) {
+                return;
+            }
+            callback.onError(e);
+        } finally {
+            activeStreamCall = null;
+        }
     }
 
+    public void cancelActiveStream() {
+        okhttp3.Call call = activeStreamCall;
+        if (call != null) {
+            call.cancel();
+        }
+    }
 }
