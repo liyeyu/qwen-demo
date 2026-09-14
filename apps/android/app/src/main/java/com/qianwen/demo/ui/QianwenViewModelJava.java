@@ -35,6 +35,13 @@ public class QianwenViewModelJava extends androidx.lifecycle.ViewModel {
     private final Runnable flushRunnable = this::flushDeltas;
     private static final int FLUSH_DELAY_MS = 120;
 
+    // adaptive delay fields
+    private long lastDeltaTimestamp = 0L;
+    private double emaIntervalMs = FLUSH_DELAY_MS; // exponential moving average of intervals
+    private static final double EMA_ALPHA = 0.3;
+    private static final int MIN_DELAY_MS = 40;
+    private static final int MAX_DELAY_MS = 300;
+
     public QianwenViewModelJava(QianwenRepositoryJava repository, String configuredApiBaseUrl) {
         this.repository = repository;
         QianwenUiState s = _state.getValue();
@@ -236,7 +243,25 @@ public class QianwenViewModelJava extends androidx.lifecycle.ViewModel {
 
     private void scheduleFlush() {
         mainHandler.removeCallbacks(flushRunnable);
-        mainHandler.postDelayed(flushRunnable, FLUSH_DELAY_MS);
+        int delay = computeAdaptiveDelay();
+        mainHandler.postDelayed(flushRunnable, delay);
+    }
+
+    private int computeAdaptiveDelay() {
+        int delay = (int) Math.round(Math.max(MIN_DELAY_MS, Math.min(MAX_DELAY_MS, emaIntervalMs)));
+        return delay;
+    }
+
+    private void recordDeltaTiming() {
+        long now = System.currentTimeMillis();
+        if (lastDeltaTimestamp > 0) {
+            double interval = (double) (now - lastDeltaTimestamp);
+            emaIntervalMs = EMA_ALPHA * interval + (1 - EMA_ALPHA) * emaIntervalMs;
+            // clamp emaIntervalMs
+            if (emaIntervalMs < MIN_DELAY_MS) emaIntervalMs = MIN_DELAY_MS;
+            if (emaIntervalMs > MAX_DELAY_MS) emaIntervalMs = MAX_DELAY_MS;
+        }
+        lastDeltaTimestamp = now;
     }
 
     private class QianwenApiEventAdapter implements com.qianwen.demo.data.QianwenApiClientJava.ChatEventCallback {
@@ -255,6 +280,8 @@ public class QianwenViewModelJava extends androidx.lifecycle.ViewModel {
                 synchronized (acc) {
                     acc.sb.append(d.delta == null ? "" : d.delta);
                 }
+                // record timing and schedule flush adaptively
+                recordDeltaTiming();
                 scheduleFlush();
             } else if (event instanceof com.qianwen.demo.data.StreamMessageEvent) {
                 // full message received - flush any buffered deltas for this messageId then add message

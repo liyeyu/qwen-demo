@@ -24,6 +24,7 @@ public class ChatActivity extends AppCompatActivity {
     private QianwenViewModelJava viewModel;
     private MessagesAdapter adapter;
     private RecyclerView recycler;
+    private LinearLayoutManager layoutManager;
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
     private final Runnable scrollRunnable = new Runnable() {
         @Override
@@ -43,7 +44,8 @@ public class ChatActivity extends AppCompatActivity {
         Button cancel = findViewById(com.qianwen.demo.R.id.cancel_button);
 
         adapter = new MessagesAdapter();
-        recycler.setLayoutManager(new LinearLayoutManager(this));
+        layoutManager = new LinearLayoutManager(this);
+        recycler.setLayoutManager(layoutManager);
         recycler.setAdapter(adapter);
 
         String convId = getIntent().getStringExtra(EXTRA_CONV_ID);
@@ -72,9 +74,20 @@ public class ChatActivity extends AppCompatActivity {
             List<ChatMessage> msgs = state.messagesByConversation.get(state.selectedConversationId);
             adapter.setItems(msgs);
 
-            // debounce scroll to bottom to avoid excessive UI work on fast streaming updates
-            uiHandler.removeCallbacks(scrollRunnable);
-            uiHandler.postDelayed(scrollRunnable, 120);
+            // only auto-scroll when the user is already at (or near) the bottom
+            boolean atBottom = true;
+            int count = adapter.getItemCount();
+            if (count > 0 && layoutManager != null) {
+                int lastCompletelyVisible = layoutManager.findLastCompletelyVisibleItemPosition();
+                // consider near-bottom within 2 items as bottom
+                atBottom = lastCompletelyVisible >= count - 2;
+            }
+
+            if (atBottom) {
+                // debounce scroll to bottom to avoid excessive UI work on fast streaming updates
+                uiHandler.removeCallbacks(scrollRunnable);
+                uiHandler.postDelayed(scrollRunnable, 120);
+            }
 
             // update draft if different
             String draft = state.draft == null ? "" : state.draft;
@@ -105,7 +118,11 @@ public class ChatActivity extends AppCompatActivity {
             public void afterTextChanged(Editable s) {}
         });
 
-        send.setOnClickListener(v -> viewModel.sendMessage());
+        send.setOnClickListener(v -> {
+            viewModel.sendMessage();
+            // after user sends a message, ensure we scroll to bottom so the assistant response is visible
+            uiHandler.postDelayed(scrollRunnable, 200);
+        });
         cancel.setOnClickListener(v -> viewModel.cancelSending());
     }
 
