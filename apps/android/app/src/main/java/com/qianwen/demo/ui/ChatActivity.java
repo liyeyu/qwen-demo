@@ -74,13 +74,13 @@ public class ChatActivity extends AppCompatActivity {
             List<ChatMessage> msgs = state.messagesByConversation.get(state.selectedConversationId);
             adapter.setItems(msgs);
 
-            // only auto-scroll when the user is already at (or near) the bottom
+            // only auto-scroll when the user is exactly at the bottom (stricter behavior)
             boolean atBottom = true;
             int count = adapter.getItemCount();
             if (count > 0 && layoutManager != null) {
                 int lastCompletelyVisible = layoutManager.findLastCompletelyVisibleItemPosition();
-                // consider near-bottom within 2 items as bottom
-                atBottom = lastCompletelyVisible >= count - 2;
+                // stricter: require the last item to be completely visible to auto-scroll
+                atBottom = lastCompletelyVisible >= count - 1;
             }
 
             if (atBottom) {
