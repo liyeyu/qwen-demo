@@ -11,13 +11,12 @@
 
 | 文件 | 说明 |
 | --- | --- |
-| `settings.gradle.kts` | 工程名 `QianwenDemo`，只包含 `:app` 一个模块；声明 google/mavenCentral 仓库。 |
-| `build.gradle.kts`（根） | 仅声明 AGP `com.android.application` 8.13.2，`apply false`。Kotlin / Compose / serialization 插件已全部移除。 |
-| `app/build.gradle.kts` | 应用模块配置：`compileSdk 35` / `minSdk 26` / `java 17`；`buildConfigField QWEN_API_BASE_URL = http://10.0.2.2:8787`。依赖：appcompat、activity、recyclerview、lifecycle-viewmodel/livedata、gson、okhttp、junit。 |
-| `gradle.properties` | AndroidX 开关、非传递 R 类、Gradle JVM 参数（Kotlin 相关配置已删除）。 |
+| `settings.gradle` | 工程名 `QianwenDemo`，只包含 `:app` 一个模块；声明 google/mavenCentral 仓库。独立构建 AAR 时用，被宿主 include 时由宿主的 settings 决定。 |
+| `build.gradle`（根） | 仅声明 AGP `com.android.application` 与 `com.android.library` 8.13.2，均 `apply false`。Kotlin / Compose / serialization 插件已全部移除。 |
+| `app/build.gradle` | **库模块**配置：`id 'com.android.library'`、`namespace com.qianwen.demo`、`compileSdk 35` / `minSdk 26` / `java 17`、`consumerProguardFiles "consumer-rules.pro"`；无 applicationId / targetSdk / versionCode。依赖：appcompat（`api`，宿主需要 AppCompat 主题）、activity、recyclerview、lifecycle-viewmodel/livedata、okhttp、gson（均 `implementation`）、junit（test）。 |
+| `app/consumer-rules.pro` | 库自带的消费端 R8 规则：保留 Gson 模型字段名（5 个模型 + 2 个嵌套类型），`-dontwarn okhttp3/okio/javax.annotation`。 |
+| `gradle.properties` | AndroidX 开关、非传递 R 类、Gradle JVM 参数（Kotlin 相关配置已删除）。注意：被宿主源码 include 时不生效。 |
 | `gradle/wrapper/*`、`gradlew`、`gradlew.bat` | Gradle 8.13 wrapper。 |
-| `INITIAL_PUSH_NOTICE.txt` | **历史遗留且已过时**：内容仍写着"本次提交不删除 Kotlin 文件、后续再迁移仓库/ViewModel/UI"，实际情况是该迁移已经完成并删除了全部 Kotlin 文件。 |
-| `CHANGELOG_DELTA_THROTTLE_NOTE.txt` | 说明 `QianwenViewModelJava` 中 delta 合并与节流（120ms 缓冲 + 自适应刷新）的设计，该逻辑在重写后仍保留。 |
 
 ---
 
@@ -25,10 +24,11 @@
 
 | 项 | 说明 |
 | --- | --- |
-| 权限 | `INTERNET`。 |
-| application | `usesCleartextTraffic=true`（模拟器直连 `http://10.0.2.2:8787`）、主题 `@style/Theme.Qianwen`、label「千问」。 |
-| `.ui.ConversationsActivity` | LAUNCHER，会话列表页（原 `MainActivity` 的启动职责）。 |
-| `.ui.ChatActivity` | 聊天页，`exported=false`，由列表页跳转进入。 |
+| 权限 | `INTERNET`（合并进宿主，无副作用）。 |
+| application | **空标签**：库不设置 `label` / `theme` / `allowBackup` / `usesCleartextTraffic`，避免覆盖宿主配置或与宿主发生 manifest merger 冲突。 |
+| `.ui.ConversationsActivity` | 会话列表页，`exported=false`，自带 `android:label="千问"` 与 `@style/Theme.Qianwen`。 |
+| `.ui.ChatActivity` | 聊天页，`exported=false`，自带 `@style/Theme.Qianwen`。 |
+| 无 launcher | 库不声明 MAIN/LAUNCHER（否则宿主会多出一个启动图标）；入口由宿主自行 `startActivity`。 |
 
 ---
 
@@ -40,7 +40,7 @@
 | `ChatMessage.java` | 消息实体：`id / conversationId / role / content / status / createdAt / updatedAt / error`，并带 `type`（`text` / `news`，默认文本）与 `news`（新闻列表）两个字段，提供 `isNews()` / `hasNews()`；历史缓存里没有 `type` 时按文本处理。 |
 | `NewsItem.java` | 新闻列表消息中的一条新闻：`id / title / img / url`。 |
 | `ChatStreamEvent.java` | SSE 单帧事件。原本拆成 5 个子类（conversation/message/delta/done/error），现合并为一个实体 + `type` 判别字段，并提供 `isDelta()` / `isError()` / `isTerminal()` / `isKnownType()` / `errorEvent()` 工厂方法；新增 `news` 事件类型与 `news` 列表字段（详见第八节）。 |
-| `ApiModels.java` | 服务端传输结构集中处（7 个嵌套 DTO）：`Health`、`Conversations`（`{conversations}`）、`ConversationEnvelope`（`{conversation}`，新建/更新共用）、`Messages`（`{conversation,messages}`）、`ChatResult`、`ConversationRequest`（title + 可空 pinned，新建与更新共用）、`ChatRequest`。 |
+| `ApiModels.java` | 服务端传输结构集中处（6 个嵌套 DTO）：`Health`、`Conversations`（`{conversations}`）、`ConversationEnvelope`（`{conversation}`，新建/更新共用）、`Messages`（`{conversation,messages}`）、`ConversationRequest`（title + 可空 pinned，新建与更新共用）、`ChatRequest`。 |
 | `LocalSnapshot.java` | 本地缓存快照（`version / savedAt / conversations / messagesByConversation / selectedConversationId`），内含 `Status` 枚举（EMPTY/RESTORED/CORRUPTED）与 `ReadResult`（快照 + 读取状态）两个嵌套类型。 |
 | `NativeScreen.java` | 导航目标值对象：`conversationId` 为 null 表示列表页，非 null 即聊天页；提供 `isChat()`。列表↔聊天页跳转的唯一依据。 |
 | `ChatSseParserJava.java` | SSE 行解析器：按 `event:` / `data:` 累积帧，遇空行 flush；type 优先取 JSON 的 `type`，否则回落 `event:` 头；`[DONE]` 返回 null；未知类型返回 null；解析异常转成 error 事件（不抛异常）。 |
@@ -204,3 +204,56 @@ data: {"type":"news","conversationId":"c-1","messageId":"m-news-1","news":[{"id"
 1. `apps/server/src/app.ts` 的 `/chat/stream` 目前只发 `conversation / message / delta / done / error`，需按 8.1 增加 `news` 帧，App 里才能看到新闻卡片。
 2. `packages/shared`、`packages/api-client` 的 `ChatStreamEvent` 类型联合，以及 `apps/ios` 的 `Models.swift`，若要同步支持需一并加 `news`。
 3. `scripts/check-contract.mjs` 的 `expectedStreamTypes` 仍写死 5 种类型，且它读取的 `androidModels / androidApi / androidParser` 指向已删除的 Kotlin 文件——该脚本在本次迁移后已失效，需要改造为读取 Java 文件并纳入 `news`。
+
+---
+
+## 九、作为 Android library 接入宿主
+
+库唯一入口是 `QianwenConfig`（`com.qianwen.demo.QianwenConfig`）：宿主注入服务端地址后直接打开会话列表页即可，没有其它初始化步骤。
+
+```java
+QianwenConfig.setBaseUrl("http://192.168.1.10:8787"); // 不调用则用默认 http://10.0.2.2:8787
+startActivity(new Intent(context, ConversationsActivity.class));
+```
+
+原来的 `buildConfigField QWEN_API_BASE_URL` 已删除：库的 BuildConfig 在编译期固化、宿主无法覆盖，因此改为运行时可注入（`QianwenConfig.getBaseUrl()` 被 `QianwenRepositoryJava` 与状态弹窗读取）。
+
+### 9.1 宿主前置条件
+
+| 项 | 要求 |
+| --- | --- |
+| 插件 / AGP | 宿主 AGP 8.x，能解析 `com.android.library`。 |
+| minSdk | **≥ 26**（库 minSdk 为 26；宿主更低会在 manifest 合并时报 `uses-sdk:minSdkVersion ... cannot be smaller`）。 |
+| Java 版本 | 库用 Java 17（`compileOptions` 已声明），宿主需一致。 |
+| 主题 | 库内 Activity 继承 `AppCompatActivity`，且各自声明 `@style/Theme.Qianwen`（继承 `Theme.AppCompat.Light.NoActionBar`）；宿主应用主题不受影响，但宿主工程必须有 AppCompat（库已用 `api` 暴露）。 |
+| 明文 HTTP | 库默认访问 `http://10.0.2.2:8787` 明文；宿主若关闭明文流量，需在 `networkSecurityConfig` 放行或改用 https。 |
+| R8 / 混淆 | 库自带 `consumer-rules.pro`，宿主 `minifyEnabled true` 时自动生效，**不需要手动 copy 规则**。 |
+| 依赖版本 | okhttp 4.12.0 / gson 2.11.0 会进入宿主 runtime classpath，宿主已在用其它大版本时需先对齐。 |
+
+### 9.2 接法一：源码模块 include（推荐）
+
+```groovy
+// 宿主 settings.gradle
+include ':qianwen'
+project(':qianwen').projectDir = file('<qwen-demo 路径>/apps/android/app')
+```
+
+再 `implementation project(':qianwen')`。两个注意点：
+
+1. 源码 include 时本目录的 `gradle.properties`（`android.useAndroidX` / `nonTransitiveRClass`）**不生效**，宿主必须自己开 `android.useAndroidX=true`；
+2. `settings.gradle` / `build.gradle`（本目录根）只用于独立构建，宿主会忽略。
+
+### 9.3 接法二：AAR
+
+```bash
+cd apps/android
+./gradlew :app:assembleRelease   # 产物 app/build/outputs/aar/app-release.aar
+```
+
+宿主 `implementation files('libs/app-release.aar')`，并需自行声明 appcompat（以及 recyclerview / lifecycle / okhttp / gson，AAR 不携带传递依赖），同时手动 copy `consumer-rules.pro` 里的规则。
+
+### 9.4 已知约束
+
+1. 资源名未加库前缀（`item_message.xml`、`item_news.xml`，id 如 `content` / `status` / `error` / `role`）；宿主若有同名资源会互相覆盖，建议后续统一加 `qianwen_` 前缀。
+2. 库内 Activity 直接继承 `AppCompatActivity`，没有预留宿主 Base Activity / 边到边（edge-to-edge）扩展点。
+3. 可配置项只有服务端地址；快照文件名（SharedPreferences `qianwen_native_store`）暂不可配置。

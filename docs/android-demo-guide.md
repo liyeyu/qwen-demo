@@ -70,7 +70,7 @@ http://10.0.2.2:8787
 
 `10.0.2.2` 是 Android Emulator 访问开发电脑 `localhost` 的保留地址，正好对应本项目服务端默认端口 `8787`。
 
-真机调试时，需要把 [apps/android/app/build.gradle.kts](../apps/android/app/build.gradle.kts) 中的 `QWEN_API_BASE_URL` 改成电脑局域网 IP，例如：
+真机调试时，需要把 [apps/android/app/build.gradle](../apps/android/app/build.gradle) 中的 `QWEN_API_BASE_URL` 改成电脑局域网 IP，例如：
 
 ```text
 http://192.168.x.x:8787

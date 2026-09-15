@@ -32,12 +32,6 @@ public final class ApiModels {
         public List<ChatMessage> messages = new ArrayList<>();
     }
 
-    public static class ChatResult {
-        public Conversation conversation;
-        public ChatMessage userMessage;
-        public ChatMessage assistantMessage;
-    }
-
     /** 新建会话传 title，更新会话传 title 或 pinned，两者共用同一结构。 */
     public static class ConversationRequest {
         public String title;

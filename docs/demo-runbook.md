@@ -206,7 +206,7 @@ Android Emulator 中的 `localhost` 指向模拟器自身，不是开发电脑�
 http://10.0.2.2:8787
 ```
 
-真机演示时，把 `apps/android/app/build.gradle.kts` 中的 `QWEN_API_BASE_URL` 改为电脑局域网 IP：
+真机演示时，把 `apps/android/app/build.gradle` 中的 `QWEN_API_BASE_URL` 改为电脑局域网 IP：
 
 ```text
 http://192.168.x.x:8787

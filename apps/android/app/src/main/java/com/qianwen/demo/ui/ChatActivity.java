@@ -19,6 +19,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import com.qianwen.demo.QianwenConfig;
 import com.qianwen.demo.R;
 import com.qianwen.demo.data.ChatMessage;
 import com.qianwen.demo.data.NativeScreen;
@@ -259,7 +260,7 @@ public class ChatActivity extends AppCompatActivity {
                 + "lastCheck：" + value(state.lastHealthCheckedAt) + "\n"
                 + "cache：" + state.cacheStatus.label + "\n"
                 + "cacheSavedAt：" + value(state.lastCacheSavedAt) + "\n"
-                + "api：" + state.apiBaseUrl;
+                + "api：" + QianwenConfig.getBaseUrl();
         new AlertDialog.Builder(this)
                 .setTitle("服务状态")
                 .setMessage(message)

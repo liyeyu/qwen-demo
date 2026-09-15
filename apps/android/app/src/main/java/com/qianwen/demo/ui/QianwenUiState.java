@@ -1,6 +1,5 @@
 package com.qianwen.demo.ui;
 
-import com.qianwen.demo.BuildConfig;
 import com.qianwen.demo.data.ApiModels;
 import com.qianwen.demo.data.ChatMessage;
 import com.qianwen.demo.data.Conversation;
@@ -83,7 +82,6 @@ public class QianwenUiState {
     public String searchQuery = "";
     public String lastHealthCheckedAt = null;
     public String lastCacheSavedAt = null;
-    public String apiBaseUrl = BuildConfig.QWEN_API_BASE_URL;
 
     public QianwenUiState() {
     }
@@ -105,7 +103,6 @@ public class QianwenUiState {
         this.searchQuery = other.searchQuery;
         this.lastHealthCheckedAt = other.lastHealthCheckedAt;
         this.lastCacheSavedAt = other.lastCacheSavedAt;
-        this.apiBaseUrl = other.apiBaseUrl;
     }
 
     public boolean isStreaming() {

@@ -16,7 +16,7 @@ public class QianwenRepositoryJava {
     private final SharedPreferences prefs;
 
     public QianwenRepositoryJava(Context context) {
-        this(context, new QianwenApiClientJava(com.qianwen.demo.BuildConfig.QWEN_API_BASE_URL), new Gson());
+        this(context, new QianwenApiClientJava(QianwenConfig.getBaseUrl()), new Gson());
     }
 
     public QianwenRepositoryJava(Context context, QianwenApiClientJava api, Gson gson) {
@@ -70,10 +70,6 @@ public class QianwenRepositoryJava {
         return response != null && response.messages != null
                 ? response.messages
                 : Collections.<ChatMessage>emptyList();
-    }
-
-    public ApiModels.ChatResult chat(String conversationId, String message) throws Exception {
-        return api.post("/chat", new ApiModels.ChatRequest(conversationId, message), ApiModels.ChatResult.class);
     }
 
     public void streamChat(String conversationId, String message, QianwenApiClientJava.ChatEventCallback callback) {

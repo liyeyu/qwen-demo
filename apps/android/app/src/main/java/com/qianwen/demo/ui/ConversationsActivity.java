@@ -15,6 +15,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import com.qianwen.demo.QianwenConfig;
 import com.qianwen.demo.R;
 import com.qianwen.demo.data.Conversation;
 import com.qianwen.demo.data.NativeScreen;
@@ -208,13 +209,9 @@ public class ConversationsActivity extends AppCompatActivity {
     }
 
     private void showSettingsDialog() {
-        QianwenUiState state = viewModel.state.getValue();
-        if (state == null) {
-            return;
-        }
-        String message = "当前 API：" + state.apiBaseUrl + "\n"
+        String message = "当前 API：" + QianwenConfig.getBaseUrl() + "\n"
                 + "模拟器：10.0.2.2 会映射到开发电脑的 localhost。\n"
-                + "真机：将 BuildConfig 中的 QWEN_API_BASE_URL 改为电脑局域网 IP。\n"
+                + "真机：调用 QianwenConfig.setBaseUrl() 指向电脑局域网 IP。\n"
                 + "本地缓存：SharedPreferences 保存最近会话、消息和选中会话。";
         new AlertDialog.Builder(this)
                 .setTitle("调试设置")
@@ -234,7 +231,7 @@ public class ConversationsActivity extends AppCompatActivity {
                 + "lastCheck：" + value(state.lastHealthCheckedAt) + "\n"
                 + "cache：" + state.cacheStatus.label + "\n"
                 + "cacheSavedAt：" + value(state.lastCacheSavedAt) + "\n"
-                + "api：" + state.apiBaseUrl;
+                + "api：" + QianwenConfig.getBaseUrl();
         new AlertDialog.Builder(this)
                 .setTitle("服务状态")
                 .setMessage(message)

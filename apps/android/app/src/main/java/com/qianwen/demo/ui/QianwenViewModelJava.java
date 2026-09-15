@@ -7,7 +7,6 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 import androidx.lifecycle.ViewModelProvider;
-import com.qianwen.demo.BuildConfig;
 import com.qianwen.demo.data.ApiModels;
 import com.qianwen.demo.data.ChatMessage;
 import com.qianwen.demo.data.ChatStreamEvent;
@@ -83,11 +82,8 @@ public class QianwenViewModelJava extends ViewModel {
         }
     }
 
-    public QianwenViewModelJava(QianwenRepositoryJava repository, String configuredApiBaseUrl) {
+    public QianwenViewModelJava(QianwenRepositoryJava repository) {
         this.repository = repository;
-        synchronized (stateLock) {
-            current.apiBaseUrl = configuredApiBaseUrl;
-        }
         liveState.setValue(new QianwenUiState(current));
         executor.submit(new Runnable() {
             @Override
@@ -97,10 +93,6 @@ public class QianwenViewModelJava extends ViewModel {
                 refreshConversations();
             }
         });
-    }
-
-    public QianwenViewModelJava(QianwenRepositoryJava repository) {
-        this(repository, BuildConfig.QWEN_API_BASE_URL);
     }
 
     public static ViewModelProvider.Factory factory(final Application application) {
